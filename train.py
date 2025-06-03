@@ -2,9 +2,7 @@ import argparse
 import os
 from dataset import WenwuDataset
 from torch.utils.data import DataLoader
-# from cn_clip import 
-from cn_clip.clip.model import convert_models_to_fp32,convert_weights
-from cn_clip.clip import load_from_name, available_models,tokenize
+from cn_clip.clip import load_from_name, tokenize
 import torch
 from torch import nn
 import tqdm
@@ -20,8 +18,6 @@ parser.add_argument("-c","--checkpoint",type=str,default=None)
 parser.add_argument("-d","--device",type=str,default=None)
 parser.add_argument("--base",type=str,default="ViT-H-14")
 args = parser.parse_args()
-
-
 
 if args.device is not None:
     device = args.device
