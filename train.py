@@ -28,7 +28,7 @@ elif torch.mps.is_available():
 else:
     device = "cpu"
     
-train_dataset = WenwuDataset(0,0.2)
+train_dataset = WenwuDataset(0.3,0.4)
 train_loader = DataLoader(train_dataset,shuffle=True,batch_size=args.batch_size,pin_memory=True)
 
 val_dataset = WenwuDataset(0.8,0.82)
