@@ -14,8 +14,8 @@ CLIP_STD  = [0.26862954, 0.26130258, 0.27577711]
 
 @cache
 def load_data():
-    data_json_path:str="/Users/zsh2401/Lab/Spiders/wenwu/data.json.txt.old"
-    images_root = Path("/Users/zsh2401/Lab/Spiders/wenwu/")
+    data_json_path:str="./dataset/data.json.txt"
+    images_root = Path("./dataset/")
     with open(data_json_path,'r') as f:
         items = json.load(f)["items"]
         ids = sorted(items.keys())
