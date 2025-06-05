@@ -36,13 +36,13 @@ def load_data():
             else:
                 for img_path in items[id]["img_paths"]:
                     dest = images_root / img_path
-                    if dest.exists():
-                        tokens = tokenize([caption]).squeeze(0)
-                        final_data.append((
-                            id, dest, caption, tokens
-                        ))
-                    else:
-                        print(f"{dest} is not exists, skipping")
+                    # if dest.exists():
+                    tokens = tokenize([caption]).squeeze(0)
+                    final_data.append((
+                        id, dest, caption, tokens
+                    ))
+                    # else:
+                        # print(f"{dest} is not exists, skipping")
         
     return final_data
 
