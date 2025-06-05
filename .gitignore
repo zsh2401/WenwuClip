@@ -5,3 +5,4 @@ dataset
 base
 checkpoints
 dataset.tar.gz
+*.reports.json

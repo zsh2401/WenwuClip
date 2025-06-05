@@ -1,4 +1,5 @@
 import argparse
+import time
 from functools import cache
 import os
 from dataset import WenwuDataset
@@ -9,7 +10,7 @@ from torch import LongTensor, nn
 import tqdm
 
 from datetime import datetime
-from train_helpers import freeze, train, evaluate
+from train_helpers import freeze, train, evaluate, save_state, read_state, read_reports, save_reports
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--batch-size", type=int, default=32)
@@ -19,6 +20,8 @@ parser.add_argument("-c", "--checkpoint", type=str, default=None)
 parser.add_argument("-d", "--device", type=str, default=None)
 parser.add_argument("--base", type=str, default="ViT-H-14")
 parser.add_argument("-s","--scale", type=float, default=1)
+parser.add_argument("-p","--project", type=str, default="default")
+parser.add_argument("--save-interval-epochs", type=int, default=1)
 args = parser.parse_args()
 
 if args.device is not None:
@@ -40,23 +43,38 @@ criterion_img = nn.CrossEntropyLoss().to(device)
 criterion_text = nn.CrossEntropyLoss().to(device)
 
 if args.checkpoint is not None:
-    checkpoint = torch.load(args.checkpoint, map_location=device)
-    model = checkpoint["model"]
-    optimizer = checkpoint["optimizer"]
-    start_epoch = checkpoint["start_epoch"]
+    model, optimizer, start_epoch, lowest_loss = read_state(args.checkpoint)
+    reports = read_reports(args.project)
 else:
     model, preprocess = load_from_name(args.base, device=device, download_root='./base')
     freeze(model)
     trainable_params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
     start_epoch = 1
+    lowest_loss = float("inf")
+    reports = {
+        "history":[]
+    }
 
+
+os.makedirs("checkpoints", exist_ok=True)
 for epoch in range(start_epoch, args.epochs + 1):
-    train(f"{epoch}/{args.epochs}", model, train_loader, optimizer, device)
+    train(f"[{args.project}]{epoch}/{args.epochs}", model, train_loader, optimizer, device)
     accuracy, val_loss = evaluate(model, val_loader, device)
-    os.makedirs("checkpoints", exist_ok=True)
-    torch.save({
-        "model": model,
-        "optimizer": optimizer,
-        "start_epoch": epoch
-    }, f"checkpoints/{epoch}-{accuracy:.2%}-{val_loss:.4}-{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}.pt")
+
+    reports["history"].append({
+        "epoch": epoch,
+        "val_accuracy": accuracy,
+        "val_loss": val_loss.item(),
+    })
+    save_reports(args.project, reports)
+
+    if val_loss < lowest_loss:
+        lowest_loss = val_loss
+        save_state(f"checkpoints/{args.project}.pt",model, optimizer, epoch,lowest_loss)
+
+if val_loss < lowest_loss:
+    lowest_loss = val_loss
+    save_state(f"checkpoints/{args.project}.pt",model, optimizer, epoch,lowest_loss)
+
+# save_state(f"checkpoints/{args.project}.pt",model, optimizer, epoch, lowest_loss)

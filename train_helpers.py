@@ -1,3 +1,6 @@
+import json
+import time
+
 import torch
 from cn_clip.clip.model import CLIP
 import tqdm
@@ -80,10 +83,10 @@ def evaluate(model: CLIP,
 
 
 def train(bar_prefix: str,
-          model: CLIP, train_loader: DataLoader,optimizer: Optimizer,
+          model: CLIP, train_loader: DataLoader, optimizer: Optimizer,
           device: DeviceObjType,
-          criterion_img: Module=CrossEntropyLoss(),
-          criterion_text: Module=CrossEntropyLoss(),
+          criterion_img: Module = CrossEntropyLoss(),
+          criterion_text: Module = CrossEntropyLoss(),
           ):
     model.train()
     with tqdm.tqdm(total=len(train_loader), desc=bar_prefix) as epoch_bar:
@@ -112,3 +115,39 @@ def train(bar_prefix: str,
 
             epoch_bar.update(1)
             epoch_bar.set_postfix(loss=f"{loss.item():.4f}")
+
+
+def read_reports(projectname:str):
+    with open(f"{projectname}.reports.json", "r") as f:
+        return json.load(f)
+
+def save_reports(projname:str, reports):
+    with open(f"{projname}.reports.json", "w") as f:
+        json.dump(reports, f)
+
+def read_state(filename:str,device:DeviceObjType):
+    checkpoint = torch.load(filename, map_location=device)
+    model = checkpoint["model"]
+    optimizer = checkpoint["optimizer"]
+    start_epoch = checkpoint["start_epoch"]
+    lowest_loss = checkpoint["lowest_loss"]
+    return model, optimizer, start_epoch, lowest_loss
+
+def save_state(filename: str,
+               model: CLIP,
+               optimizer: Optimizer,
+               epoch: int,
+               lowest_loss: float,
+               ):
+    print("Saving...")
+    start = time.time()
+    torch.save({
+        "model": model,
+        "optimizer": optimizer,
+        "start_epoch": epoch,
+        "lowest_loss": lowest_loss,
+    }, filename)
+    end = time.time()
+    print(f"Saved checkpoint at epoch {epoch} and lowest loss {lowest_loss} at {end - start} seconds")
+
+
