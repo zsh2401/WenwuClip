@@ -1,10 +1,11 @@
 import argparse
+from functools import cache
 import os
 from dataset import WenwuDataset
 from torch.utils.data import DataLoader
 from cn_clip.clip import load_from_name, tokenize
 import torch
-from torch import nn
+from torch import LongTensor, nn
 import tqdm
 
 from datetime import datetime
@@ -51,6 +52,10 @@ else:
     criterion_text = nn.CrossEntropyLoss().to(device)
     start_epoch = 1
 
+@cache
+def cached_tokenize(texts:list[str])->LongTensor:
+    return tokenize(texts)
+
 for epoch in range(start_epoch, args.epochs + 1):
     model.train()
     
@@ -60,7 +65,7 @@ for epoch in range(start_epoch, args.epochs + 1):
             optimizer.zero_grad()
         
             images = images.to(device)
-            tokenized_texts = tokenize(texts).to(device)
+            tokenized_texts = cached_tokenize(texts).to(device)
             
             image_feats, text_feats,logit_scale = model(images,tokenized_texts)
             
