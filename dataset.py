@@ -1,4 +1,5 @@
 from functools import cache
+import os
 from pathlib import Path
 import json
 
@@ -26,9 +27,13 @@ def load_data():
                 print(f"No images found for {items[id]["name"]}")
             else:
                 for img_path in items[id]["img_paths"]:
-                    final_data.append((
-                        id,images_root / img_path, caption
-                    ))
+                    dest = images_root / img_path
+                    if dest.exists():
+                        final_data.append((
+                            id,dest, caption
+                        ))
+                    else:
+                        print(f"{dest} is not exists, skipping")
         
     return final_data
 
