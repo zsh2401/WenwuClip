@@ -60,14 +60,14 @@ for epoch in range(start_epoch, args.epochs + 1):
     model.train()
     
     with tqdm.tqdm(total=len(train_loader),desc=f"Epoch {epoch}/{args.epochs}") as epoch_bar:
-        for images,texts in train_loader:
+        for images,text_tokens in train_loader:
             epoch_bar.set_postfix(loss=f"0.0000")
             optimizer.zero_grad()
         
             images = images.to(device)
-            tokenized_texts = cached_tokenize(texts).to(device)
+            text_tokens = text_tokens.to(device)
             
-            image_feats, text_feats,logit_scale = model(images,tokenized_texts)
+            image_feats, text_feats,logit_scale = model(images,text_tokens)
             
             # # 2. 直接点积再乘以温度
             logits_per_image = logit_scale * image_feats @ text_feats.t()  # [B, B]
@@ -94,13 +94,13 @@ for epoch in range(start_epoch, args.epochs + 1):
         # 验证：
         correct,total = 0,0
         with torch.no_grad():
-            for images,texts in val_loader:   
+            for images,text_tokens in val_loader:   
                 val_bar.set_postfix({
                     "acc":f"00%",
                     "val_loss":f"0.0000"
                 })
                 images = images.to(device)
-                tokenized_texts = tokenize(texts).to(device)
+                tokenized_texts = tokenize(text_tokens).to(device)
                 image_feats, text_feats, logit_scale = model(images,tokenized_texts)
                 
                 # # 2. 直接点积再乘以温度

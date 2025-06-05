@@ -9,10 +9,17 @@ import math
 import tqdm
 from torchvision import transforms
 
+from cn_clip.clip import tokenize
 # CLIP 官方预训练时常用的归一化参数（RGB 三个通道的均值和标准差）
 CLIP_MEAN = [0.48145466, 0.4578275, 0.40821073]
 CLIP_STD  = [0.26862954, 0.26130258, 0.27577711]
 
+transform = transforms.Compose([
+            transforms.RandomResizedCrop((224,224),scale=(0.8,1.0),ratio=(3/4,4/3)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(CLIP_MEAN,CLIP_STD)
+        ])
 @cache
 def load_data():
     data_json_path:str="./dataset/data.json.txt"
@@ -29,8 +36,9 @@ def load_data():
                 for img_path in items[id]["img_paths"]:
                     dest = images_root / img_path
                     if dest.exists():
+                        tokens = tokenize([caption]).squeeze(0)
                         final_data.append((
-                            id,dest, caption
+                            id, dest, caption, tokens
                         ))
                     else:
                         print(f"{dest} is not exists, skipping")
@@ -50,21 +58,16 @@ class WenwuDataset:
     def __init__(self,start_p:float,end_p:float):
         self.data = load_data()
         self.data = self.data[math.floor(start_p * len(self.data)):math.floor(end_p * len(self.data))]
-        self.transform = transforms.Compose([
-            transforms.RandomResizedCrop((224,224),scale=(0.8,1.0),ratio=(3/4,4/3)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(CLIP_MEAN,CLIP_STD)
-        ])
+        self.transform = transform
                     
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        id, image, caption =  self.data[idx]
+        id, image, caption,tokens =  self.data[idx]
         image = Image.open(image).convert('RGB')
         image_tensor = self.transform(image)
         assert not torch.isnan(image_tensor).any(), "Image tensor contains NaN"
         assert not torch.isinf(image_tensor).any(), "Image tensor contains Inf"
         assert not "" == caption.strip(), "Caption is empty"
-        return image_tensor, caption
+        return image_tensor, tokens
