@@ -12,6 +12,7 @@ from torch.optim import Optimizer
 
 
 def freeze(model: CLIP):
+    return
     for params in model.parameters():
         params.requires_grad = False
     # 冻结ViT-H/14前30层，解冻后几层
@@ -89,11 +90,11 @@ def train(bar_prefix: str,
           criterion_text: Module = CrossEntropyLoss(),
           ):
     model.train()
-    with tqdm.tqdm(total=len(train_loader), desc=bar_prefix) as epoch_bar:
-        for images, text_tokens in train_loader:
-            epoch_bar.set_postfix(loss=f"0.0000")
-            optimizer.zero_grad()
 
+    with tqdm.tqdm(total=len(train_loader), desc=bar_prefix) as epoch_bar:
+        epoch_bar.set_postfix(loss=f"0.0000")
+        for images, text_tokens in train_loader:
+            optimizer.zero_grad()
             images = images.to(device)
             text_tokens = text_tokens.to(device)
 
