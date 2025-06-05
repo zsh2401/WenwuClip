@@ -159,7 +159,9 @@ def train(bar_prefix: str,
 
             if use_amp:
                 with torch.autocast(device_type=device, dtype=torch.float16):
+                    # print(f"{device} float 16")
                     loss = get_loss(model, images, text_tokens, device, criterion_img, criterion_text)
+                    # print(loss.dtype)
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
