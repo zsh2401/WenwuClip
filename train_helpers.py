@@ -5,7 +5,7 @@ def freeze(model:CLIP):
     for params in model.parameters():
         params.requires_grad = False
     # 冻结ViT-H/14前30层，解冻后几层
-    for layer in model.visual.transformer.resblocks[30:]:
+    for layer in model.visual.transformer.resblocks[28:]:
         for param in layer.parameters():
             param.requires_grad = True
 
