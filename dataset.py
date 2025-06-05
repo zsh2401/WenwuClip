@@ -7,6 +7,7 @@ import torch
 from PIL import Image
 import math
 import tqdm
+from torch.utils.data import Dataset
 from torchvision import transforms
 
 from cn_clip.clip import tokenize
@@ -54,8 +55,9 @@ def build_captions(item)->list[str]:
         result.append( f"{",".join(item["types"])}")
     return result
 
-class WenwuDataset:
+class WenwuDataset(Dataset):
     def __init__(self,start_p:float,end_p:float):
+        super().__init__()
         self.data = load_data()
         self.data = self.data[math.floor(start_p * len(self.data)):math.floor(end_p * len(self.data))]
         self.transform = transform
