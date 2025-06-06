@@ -1,6 +1,7 @@
 import json
 import time
 import types
+from typing import Dict, Sequence
 
 import torch
 from cn_clip.clip.model import CLIP
@@ -69,6 +70,85 @@ def freeze(model: CLIP):
     print(f"Trainable Parameters / Total = {trainable_params} / {total_params} = {trainable_params / total_params:.2%}")
 
 
+@torch.no_grad()
+def evaluate_clip_multicap(
+        model: CLIP,  # ✦ CLIP / CN-CLIP / OpenCLIP 模型
+        data_loader: DataLoader,  # ✦ batch = (img_tensor, text_tokens_tensor, img_id)
+        device: str | torch.device,
+        topk: Sequence[int] = (1, 5, 10),
+        l2_norm: bool = True,
+) -> Dict[str, float]:
+    """
+    计算多文一图场景下的 I→T / T→I Recall@K
+
+    -------------
+    数据假设
+    -------------
+      • (image, caption, img_id) 已在 Dataset 中“一张图 × N 条 caption” 全展开
+      • 同一张图在不同样本里 img_id 相同
+
+    -------------
+    返回值示例
+    -------------
+      {'i2t_R1': 11.23, 'i2t_R5': 28.74, 'i2t_R10': 39.85,
+       't2i_R1': 10.17, 't2i_R5': 26.02, 't2i_R10': 36.44}
+    """
+
+    model.eval()
+
+    # ---------- Step 1: 前向提特征 ----------
+    img_feat_dict: dict[int, torch.Tensor] = {}  # img_id ➜ feature
+    img_id_order: list[int] = []  # 记录唯一图片的顺序
+    txt_feats = []  # 全部文本特征
+    txt2img = []  # 每条文本对应的 img_id
+
+    for imgs, txt_tokens, img_ids in tqdm.tqdm(data_loader, desc="Inferencing input embeddings"):
+        imgs, txt_tokens, img_ids = (imgs.to(device),
+                                     txt_tokens.to(device),
+                                     img_ids.to(device))
+
+        f_img = model.encode_image(imgs)
+        f_txt = model.encode_text(txt_tokens)
+
+        if l2_norm:
+            f_img = f_img / f_img.norm(dim=-1, keepdim=True)
+            f_txt = f_txt / f_txt.norm(dim=-1, keepdim=True)
+
+        # 收集唯一图像特征
+        for j, gid in enumerate(img_ids):
+            gid_int = int(gid.item())
+            if gid_int not in img_feat_dict:
+                img_feat_dict[gid_int] = f_img[j]
+                img_id_order.append(gid_int)
+
+        txt_feats.append(f_txt)
+        txt2img.extend(img_ids.tolist())
+
+    image_embs = torch.stack([img_feat_dict[i] for i in img_id_order]).to(device)  # (N_img, D)
+    text_embs = torch.cat(txt_feats, dim=0)  # (N_txt, D)
+    txt2img_t = torch.tensor(txt2img, device=device)  # (N_txt,)
+    row_img_id = torch.tensor(img_id_order, device=device)  # (N_img,)
+
+    # ---------- Step 2: 相似度矩阵 ----------
+    sim_i2t = image_embs @ text_embs.T  # (N_img, N_txt)
+    sim_t2i = sim_i2t.T  # (N_txt, N_img)
+
+    # ---------- Step 3: 计算 Recall ----------
+    results: Dict[str, float] = {}
+    for k in topk:
+        # I → T ：检查任意 top-k caption 的 img_id 是否等于查询图像
+        idx_top_txt = sim_i2t.topk(k, dim=-1).indices  # (N_img, k)
+        hit_i2t = (txt2img_t[idx_top_txt] == row_img_id.unsqueeze(1)).any(dim=1)
+        results[f"i2t_R{k}"] = hit_i2t.float().mean().item() * 100
+
+        # T → I ：查询 caption 的正确图像在 top-k 内？
+        idx_top_img = sim_t2i.topk(k, dim=-1).indices  # (N_txt, k)
+        hit_t2i = (idx_top_img == txt2img_t.unsqueeze(1)).any(dim=1)
+        results[f"t2i_R{k}"] = hit_t2i.float().mean().item() * 100
+
+    return results
+
+
 def evaluate(model: CLIP,
              val_loader: DataLoader,
              device: DeviceObjType,
@@ -80,7 +160,7 @@ def evaluate(model: CLIP,
         # 验证：
         correct, total = 0, 0
         with torch.no_grad():
-            for images, text_tokens in val_loader:
+            for images, text_tokens, img_ids in val_loader:
                 val_bar.set_postfix({
                     "acc": f"00%",
                     "val_loss": f"0.0000"
@@ -105,7 +185,7 @@ def evaluate(model: CLIP,
                 accuracy = correct / total
                 val_bar.set_postfix({
                     "acc": f"{accuracy:.2%}",
-                    "val_loss": f"{val_loss:.4f}"
+                    "loss": f"{val_loss:.4f}"
                 })
                 val_bar.update(1)
 
@@ -151,7 +231,7 @@ def train(bar_prefix: str,
 
     with tqdm.tqdm(total=len(train_loader), desc=bar_prefix) as epoch_bar:
         epoch_bar.set_postfix(loss=f"0.0000")
-        for images, text_tokens in train_loader:
+        for images, text_tokens, img_ids in train_loader:
             optimizer.zero_grad()
 
             images = move_to(images, device, precision)
@@ -181,31 +261,32 @@ def read_reports(projectname: str):
 
 def save_reports(projname: str, reports):
     with open(f"{projname}.reports.json", "w") as f:
-        json.dump(reports, f)
+        json.dump(reports, f, indent=4, ensure_ascii=False)
 
 
-def read_state(filename: str, device: DeviceObjType):
+def read_state(filename: str, device: str):
     checkpoint = torch.load(filename, map_location=device)
-    model = checkpoint["model"]
-    optimizer = checkpoint["optimizer"]
+    model_state = checkpoint["model"]
+    optimizer_state = checkpoint["optimizer"]
     start_epoch = checkpoint["start_epoch"]
-    lowest_loss = checkpoint["lowest_loss"]
-    return model, optimizer, start_epoch, lowest_loss
+    scaler = checkpoint["scaler"]
+    return model_state, optimizer_state, scaler, start_epoch
 
 
 def save_state(filename: str,
                model: CLIP,
                optimizer: Optimizer,
                epoch: int,
-               lowest_loss: float,
+               scaler: GradScaler
                ):
     print("Saving...")
     start = time.time()
     torch.save({
-        "model": model,
-        "optimizer": optimizer,
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
         "start_epoch": epoch,
-        "lowest_loss": lowest_loss,
+        "scaler": scaler.state_dict(),
+        "epoch": epoch
     }, filename)
     end = time.time()
-    print(f"Saved checkpoint at epoch {epoch} and lowest loss {lowest_loss} at {end - start} seconds")
+    print(f"Saved checkpoint at epoch {epoch} at {end - start} seconds")
