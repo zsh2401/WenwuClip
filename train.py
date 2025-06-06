@@ -10,7 +10,8 @@ from torch import LongTensor, nn
 import tqdm
 
 from datetime import datetime
-from train_helpers import freeze, train, evaluate, save_state, read_state, read_reports, save_reports, tackle, move_to
+from train_helpers import train, evaluate, save_state, read_state, read_reports, save_reports, tackle, move_to
+from freeze_strategies import freeze
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--batch-size", type=int, default=32)
@@ -58,8 +59,7 @@ model, preprocess = load_from_name(args.base, device=device, download_root='./ba
 
 
 def freeze_and_get_optimizer(_optimizer_state=None):
-    if args.freeze_mode == "a":
-        freeze(model)
+    freeze(model, args.freeze_mode)
     trainable_params = [p for p in model.parameters() if p.requires_grad]
     _optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
     if _optimizer_state is not None:
@@ -105,7 +105,7 @@ for epoch in range(start_epoch, args.epochs + 1):
     if val_loss < lowest_loss:
         lowest_loss = val_loss
         save_state(filename=f"checkpoints/{args.project}.pt",
-                   model=model, optimizer=optimizer, epoch=epoch,scaler=scaler)
+                   model=model, optimizer=optimizer, epoch=epoch, scaler=scaler)
 
 if val_loss < lowest_loss:
     lowest_loss = val_loss

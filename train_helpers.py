@@ -41,35 +41,6 @@ def tackle(model: CLIP):
     #         m.float()
 
 
-def freeze(model: CLIP):
-    # return
-    for params in model.parameters():
-        params.requires_grad = False
-    # 冻结ViT-H/14前30层，解冻后几层
-    for layer in model.visual.transformer.resblocks[28:]:
-        for param in layer.parameters():
-            param.requires_grad = True
-
-    for layer in model.bert.encoder.layer[20:]:
-        for param in layer.parameters():
-            param.requires_grad = True
-
-    # 确保logit_scale解冻（如需冻结则设False）
-    model.logit_scale.requires_grad = True
-
-    # 3. 简单检查：打印出哪些模块是可训练的
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(f"\tTrainable\t{name}")
-        else:
-            print(f"\tFreezed..\t{name}")
-
-    # 4. 建议：计算一下可训练参数占比
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Trainable Parameters / Total = {trainable_params} / {total_params} = {trainable_params / total_params:.2%}")
-
-
 @torch.no_grad()
 def evaluate_clip_multicap(
         model: CLIP,  # ✦ CLIP / CN-CLIP / OpenCLIP 模型
@@ -157,14 +128,14 @@ def evaluate(model: CLIP,
              ):
     model.eval()
     with tqdm.tqdm(total=len(val_loader), desc=f"Validating") as val_bar:
+        val_bar.set_postfix({
+            "acc": f"00%",
+            "val_loss": f"0.0000"
+        })
         # 验证：
         correct, total = 0, 0
         with torch.no_grad():
             for images, text_tokens, img_ids in val_loader:
-                val_bar.set_postfix({
-                    "acc": f"00%",
-                    "val_loss": f"0.0000"
-                })
                 images = images.to(device)
                 text_tokens = text_tokens.to(device)
                 image_feats, text_feats, logit_scale = model(images, text_tokens)
@@ -192,7 +163,7 @@ def evaluate(model: CLIP,
         return accuracy, val_loss
 
 
-def get_loss(model: CLIP, images, text_tokens, device,
+def get_loss(model: CLIP, images, text_tokens,
              criterion_img: Module = CrossEntropyLoss(),
              criterion_text: Module = CrossEntropyLoss(), ):
     image_feats, text_feats, logit_scale = model(images, text_tokens)
@@ -202,7 +173,7 @@ def get_loss(model: CLIP, images, text_tokens, device,
     logits_per_text = logits_per_image.t()  # [B, B]
 
     # # 3. 交叉熵
-    labels = torch.arange(images.size(0), device=device)
+    labels = torch.arange(images.size(0), device=model.device)
     loss_i2t = criterion_img(logits_per_image, labels)
     loss_t2i = criterion_text(logits_per_text, labels)
     loss = (loss_i2t + loss_t2i) / 2
@@ -240,13 +211,13 @@ def train(bar_prefix: str,
             if use_amp:
                 with torch.autocast(device_type=device, dtype=torch.float16):
                     # print(f"{device} float 16")
-                    loss = get_loss(model, images, text_tokens, device, criterion_img, criterion_text)
+                    loss = get_loss(model, images, text_tokens, criterion_img, criterion_text)
                     # print(loss.dtype)
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
             else:
-                loss = get_loss(model, images, text_tokens, device, criterion_img, criterion_text)
+                loss = get_loss(model, images, text_tokens, criterion_img, criterion_text)
                 loss.backward()
                 optimizer.step()
 
