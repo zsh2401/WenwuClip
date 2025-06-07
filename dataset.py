@@ -98,7 +98,7 @@ class WenwuDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
-    @decorator_timer
+    # @decorator_timer
     def __getitem__(self, idx):
         id, image, caption, img_id = self.data[idx]
         if self.img_in_memory:
