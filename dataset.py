@@ -62,10 +62,15 @@ def build_captions(item) -> list[str]:
     return result
 
 
+@cache
+def get_image(path: str):
+    return Image.open(path).convert('RGB')
+
 class WenwuDataset(Dataset):
-    def __init__(self, start_p: float, end_p: float):
+    def __init__(self, start_p: float, end_p: float, img_in_memory=False):
         super().__init__()
         self.data = load_data()
+        self.img_in_memory = img_in_memory
         self.data = self.data[math.floor(start_p * len(self.data)):math.floor(end_p * len(self.data))]
         self.transform = transform
 
@@ -74,7 +79,10 @@ class WenwuDataset(Dataset):
 
     def __getitem__(self, idx):
         id, image, caption, img_id = self.data[idx]
-        image = Image.open(image).convert('RGB')
+        if self.img_in_memory:
+            image = get_image(str(image))
+        else:
+            image = Image.open(image).convert('RGB')
         image_tensor = self.transform(image)
         assert not torch.isnan(image_tensor).any(), "Image tensor contains NaN"
         assert not torch.isinf(image_tensor).any(), "Image tensor contains Inf"
@@ -82,6 +90,7 @@ class WenwuDataset(Dataset):
         tokens = tokenize([caption]).squeeze(0)
         return image_tensor, tokens, img_id
 
+
 if __name__ == "__main__":
     print("Building captions dataset...")
-    print(WenwuDataset(0,1)[10])
+    print(WenwuDataset(0, 1)[10])

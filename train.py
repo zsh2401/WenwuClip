@@ -20,6 +20,7 @@ parser.add_argument("-b", "--batch-size", type=int, default=32)
 parser.add_argument("-e", "--epochs", type=int, default=6)
 parser.add_argument("-l", "--lr", type=float, default=5e-7)
 parser.add_argument("-c", "--checkpoint", type=str, default=None)
+parser.add_argument("--image-in-memory", type=bool, default=False)
 parser.add_argument("-w", "--workers", type=int, default=8)
 parser.add_argument("-d", "--device", type=str, default=None)
 parser.add_argument("--base", type=str, default="ViT-H-14")
@@ -46,11 +47,11 @@ else:
 use_amp = (args.precision == "amp") and (device == "cuda")
 scaler = torch.GradScaler(device=device, enabled=use_amp)
 
-train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale))
+train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.images_in_memory)
 train_loader = DataLoader(train_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
                           pin_memory=True)
 
-val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale))
+val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.images_in_memory)
 val_loader = DataLoader(val_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
                         pin_memory=True)
 
