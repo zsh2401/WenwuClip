@@ -25,7 +25,7 @@ transform = transforms.Compose([
 
 
 @cache
-def load_data():
+def load_data(heat_images=False):
     data_json_path: str = "./dataset/data.json.txt"
     images_root = Path("./dataset/")
     with open(data_json_path, 'r') as f:
@@ -48,6 +48,8 @@ def load_data():
                     final_data.append((
                         id, dest, caption, img_id
                     ))
+                    # if heat_images:
+                    #     get_image(str(dest))
 
     return final_data
 
@@ -90,7 +92,7 @@ class WenwuDataset(Dataset):
                  end_p: float,
                  img_in_memory=False, img_preprocess=None):
         super().__init__()
-        self.data = load_data()
+        self.data = load_data(img_in_memory)
         self.img_preprocess = img_preprocess
         self.img_in_memory = img_in_memory
         self.data = self.data[math.floor(start_p * len(self.data)):math.floor(end_p * len(self.data))]
