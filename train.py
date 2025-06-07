@@ -24,7 +24,7 @@ parser.add_argument("-w", "--workers", type=int, default=8)
 parser.add_argument("-d", "--device", type=str, default=None)
 parser.add_argument("--base", type=str, default="ViT-H-14")
 parser.add_argument("--data-scale", type=float, default=1)
-parser.add_argument("--freeze_mode", type=str, default="a")
+parser.add_argument("--freeze-mode", type=str, default="a")
 parser.add_argument("-p", "--project", type=str, default="default")
 parser.add_argument(
     "--precision",
