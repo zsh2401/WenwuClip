@@ -12,6 +12,7 @@ import tqdm
 from datetime import datetime
 
 torch.backends.verbose = True
+torch.backends.cudnn.benchmark = True
 from model import WenWuClip
 from train_helpers import train, evaluate, save_state, read_state, read_reports, save_reports, tackle, move_to
 from freeze_strategies import freeze
