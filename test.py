@@ -13,6 +13,7 @@ parser.add_argument("-c", "--checkpoint", type=str, default=None)
 parser.add_argument("-d", "--device", type=str, default=None)
 parser.add_argument("--data-scale", type=float, default=1)
 parser.add_argument("--base", type=str, default="ViT-H-14")
+parser.add_argument("--workers", type=int, default=8)
 args = parser.parse_args()
 
 if args.device is not None:
@@ -25,11 +26,11 @@ else:
     device = "cpu"
 
 test_dataset = WenwuDataset(0.9, 0.9 + (0.1 * args.data_scale))
-test_loader = DataLoader(test_dataset, batch_size=args.batch_size, pin_memory=True)
+test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=args.workers, pin_memory=True)
 
 model, preprocess = load_from_name(args.base, device=device, download_root='./base')
 if args.checkpoint is not None:
-    model_state = read_state(args.checkpoint,device)[0]
+    model_state = read_state(args.checkpoint, device)[0]
     model.load_state_dict(model_state)
 else:
     print("Using vanilla model for testing")
@@ -38,5 +39,5 @@ model.to(device)
 # evaluate(model, test_loader, device)
 
 scores = evaluate_clip_multicap(model, test_loader, device)
-print("Image → Text  Recall:", {k:v for k,v in scores.items() if k.startswith('i2t')})
-print("Text  → Image Recall:", {k:v for k,v in scores.items() if k.startswith('t2i')})
+print("Image → Text  Recall:", {k: v for k, v in scores.items() if k.startswith('i2t')})
+print("Text  → Image Recall:", {k: v for k, v in scores.items() if k.startswith('t2i')})
