@@ -48,8 +48,8 @@ def load_data(heat_images=False):
                     final_data.append((
                         id, dest, caption, img_id
                     ))
-                    # if heat_images:
-                    #     get_image(str(dest))
+                    if heat_images:
+                        get_image(str(dest))
 
     return final_data
 
