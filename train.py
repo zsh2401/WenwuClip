@@ -47,11 +47,11 @@ else:
 use_amp = (args.precision == "amp") and (device == "cuda")
 scaler = torch.GradScaler(device=device, enabled=use_amp)
 
-train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.images_in_memory)
+train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.image_in_memory)
 train_loader = DataLoader(train_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
                           pin_memory=True)
 
-val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.images_in_memory)
+val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.image_in_memory)
 val_loader = DataLoader(val_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
                         pin_memory=True)
 
