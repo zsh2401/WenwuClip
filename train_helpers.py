@@ -3,6 +3,7 @@ import time
 import types
 from typing import Dict, Sequence
 
+import numpy as np
 import torch
 from cn_clip.clip.model import CLIP
 import tqdm
@@ -40,70 +41,78 @@ def tackle(model: CLIP):
     #     if isinstance(m, (torch.nn.LayerNorm, torch.nn.Softmax)):
     #         m.float()
 
+import torch
+from torch.utils.data import DataLoader
+from typing import Sequence, Dict
 
 @torch.no_grad()
 def evaluate_clip_multicap(
-        model: "CLIP",
-        data_loader: DataLoader,          # batch = (img_tensor, text_tokens, img_id)
-        device: str | torch.device,
-        topk: Sequence[int] = (1, 5, 10),
-        l2_norm: bool = True,
+    model,
+    val_loader: DataLoader,               # 每 batch = (image, tokens, img_id)
+    device: str | torch.device = "cuda",
+    topk: Sequence[int] = (1, 5, 10),
+    l2_norm: bool = True,
 ) -> Dict[str, float]:
+    """
+    一图多文场景下计算 I→T / T→I Recall@K
+    model      : CLIP / OpenCLIP / CN-CLIP，需有 encode_image / encode_text
+    val_loader : 不 shuffle；Dataset 已将“一张图 × 多 caption” 展开
+    """
 
     model.eval()
+    model.to(device)
 
-    # ---------- 1) 提取所有图 / 文特征 ----------
-    img_feat_dict, img_id_order = {}, []
-    txt_feats, txt2img = [], []
+    # 1️⃣  把所有图片 / 文本向量提前算好
+    img_feat_dict, img_id_order = {}, []         # id → embedding；保持顺序
+    txt_feats, txt2img = [], []                  # 文本 embedding；其归属 img_id
 
-    for imgs, txt_tokens, img_ids in data_loader:
-        imgs, txt_tokens, img_ids = imgs.to(device), txt_tokens.to(device), img_ids.to(device)
+    for imgs, txt_tok, img_ids in val_loader:
+        imgs, txt_tok, img_ids = imgs.to(device), txt_tok.to(device), img_ids.to(device)
 
         f_img = model.encode_image(imgs)
-        f_txt = model.encode_text(txt_tokens)
+        f_txt = model.encode_text(txt_tok)
 
         if l2_norm:
             f_img = f_img / f_img.norm(dim=-1, keepdim=True)
             f_txt = f_txt / f_txt.norm(dim=-1, keepdim=True)
 
+        # 同一张图只保留一次特征
         for j, gid in enumerate(img_ids):
-            g = int(gid.item())
-            if g not in img_feat_dict:               # 只保存每张图第一份特征
+            g = int(gid)
+            if g not in img_feat_dict:
                 img_feat_dict[g] = f_img[j]
                 img_id_order.append(g)
 
         txt_feats.append(f_txt)
         txt2img.extend(img_ids.tolist())
 
-    image_embs = torch.stack([img_feat_dict[i] for i in img_id_order]).to(device)  # (N_img, D)
-    text_embs  = torch.cat(txt_feats, dim=0)                                       # (N_txt, D)
-    txt2img_t  = torch.tensor(txt2img, device=device)                              # (N_txt,)
+    image_embs = torch.stack([img_feat_dict[i] for i in img_id_order]).to(device)   # (N_img, D)
+    text_embs  = torch.cat(txt_feats, dim=0)                                        # (N_txt, D)
+    txt2img_t  = torch.tensor(txt2img, device=device)                               # (N_txt,)
 
-    # ---------- 2) 相似度矩阵 ----------
-    sim_i2t = image_embs @ text_embs.T                                             # (N_img, N_txt)
-    sim_t2i = sim_i2t.T                                                            # (N_txt, N_img)
+    # 2️⃣  建立【图片 ID ↔ 行号】互映
+    id2row   = {img_id: row for row, img_id in enumerate(img_id_order)}             # id → 行号
+    row2id_t = torch.tensor(img_id_order, device=device)                            # 行号 → id
+    txt2row  = torch.tensor([id2row[i] for i in txt2img], device=device)            # 文本 → 行号
 
-    # 关键修正 ⮟⮟ ————————————————————————————————————————————————
-    # 建立 “图片 ID  →  行号” 映射，把 txt2img 转成行号版本
-    id2row   = {img_id: row for row, img_id in enumerate(img_id_order)}
-    txt2row  = torch.tensor([id2row[i] for i in txt2img], device=device)           # (N_txt,)
-    # ————————————————————————————————————————————————————————————
+    # 3️⃣  相似度矩阵
+    sim_i2t = image_embs @ text_embs.T        # (N_img, N_txt)
+    sim_t2i = sim_i2t.T                       # (N_txt, N_img)
 
-    results = {}
+    results: Dict[str, float] = {}
     for k in topk:
-        # I → T
-        idx_top_txt = sim_i2t.topk(k, dim=-1).indices                              # (N_img, k)
-        hit_i2t = (txt2img_t[idx_top_txt] == torch.arange(
-                    sim_i2t.size(0), device=device).unsqueeze(1)).any(dim=1)
+        # —— I → T（按行求 top-k caption）
+        idx_top_txt = sim_i2t.topk(k, dim=-1).indices                # (N_img, k)
+        hit_i2t = (txt2row[idx_top_txt] == torch.arange(
+                   sim_i2t.size(0), device=device).unsqueeze(1)).any(dim=1)
         results[f"i2t_R{k}"] = hit_i2t.float().mean().item() * 100
 
-        # T → I  (行号与行号比较)
-        idx_top_img = sim_t2i.topk(k, dim=-1).indices                              # (N_txt, k)
+        # —— T → I（按行求 top-k image）
+        idx_top_img = sim_t2i.topk(k, dim=-1).indices                # (N_txt, k)
         hit_t2i = (idx_top_img == txt2row.unsqueeze(1)).any(dim=1)
         results[f"t2i_R{k}"] = hit_t2i.float().mean().item() * 100
 
     return results
-
 
 def evaluate(model: CLIP,
              val_loader: DataLoader,
