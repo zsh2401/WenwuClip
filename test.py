@@ -35,7 +35,7 @@ else:
     print("Using vanilla model for testing")
 model.to(device)
 
-evaluate(model, test_loader, device)
+# evaluate(model, test_loader, device)
 
 scores = evaluate_clip_multicap(model, test_loader, device)
 print("Image → Text  Recall:", {k:v for k,v in scores.items() if k.startswith('i2t')})
