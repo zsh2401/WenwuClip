@@ -32,8 +32,11 @@ parser.add_argument(
     choices=["fp32", "amp", "fp16"],  # 新增 'fp32' / 'fp16'
     default="fp32"
 )
+
 parser.add_argument("--save-interval-epochs", type=int, default=1)
 args = parser.parse_args()
+if args.image_in_memory:
+    print("Using Image In-Memory")
 
 if args.device is not None:
     device = args.device
