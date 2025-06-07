@@ -66,6 +66,12 @@ def build_captions(item) -> list[str]:
 def get_image(path: str):
     return Image.open(path).convert('RGB')
 
+
+@cache
+def cached_tokenized(text):
+    return tokenize([text]).squeeze(0)
+
+
 class WenwuDataset(Dataset):
     def __init__(self, start_p: float, end_p: float, img_in_memory=False):
         super().__init__()
@@ -87,8 +93,8 @@ class WenwuDataset(Dataset):
         assert not torch.isnan(image_tensor).any(), "Image tensor contains NaN"
         assert not torch.isinf(image_tensor).any(), "Image tensor contains Inf"
         assert not "" == caption.strip(), "Caption is empty"
-        tokens = tokenize([caption]).squeeze(0)
-        return image_tensor, tokens, img_id
+        # tokens = tokenize([caption]).squeeze(0)
+        return image_tensor, cached_tokenized(caption), img_id
 
 
 if __name__ == "__main__":
