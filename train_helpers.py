@@ -165,7 +165,7 @@ def evaluate(model: CLIP,
 
 def get_loss(model: CLIP, images, text_tokens,
              criterion_img: Module = CrossEntropyLoss(),
-             criterion_text: Module = CrossEntropyLoss(), ):
+             criterion_text: Module = CrossEntropyLoss()):
     image_feats, text_feats, logit_scale = model(images, text_tokens)
 
     # # 2. 直接点积再乘以温度
@@ -173,7 +173,7 @@ def get_loss(model: CLIP, images, text_tokens,
     logits_per_text = logits_per_image.t()  # [B, B]
 
     # # 3. 交叉熵
-    labels = torch.arange(images.size(0), device=model.device)
+    labels = torch.arange(images.size(0), device=images.device)
     loss_i2t = criterion_img(logits_per_image, labels)
     loss_t2i = criterion_text(logits_per_text, labels)
     loss = (loss_i2t + loss_t2i) / 2
