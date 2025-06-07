@@ -11,6 +11,7 @@ import tqdm
 
 from datetime import datetime
 
+torch.backends.verbose = True
 from model import WenWuClip
 from train_helpers import train, evaluate, save_state, read_state, read_reports, save_reports, tackle, move_to
 from freeze_strategies import freeze
@@ -53,11 +54,16 @@ scaler = torch.GradScaler(device=device, enabled=use_amp)
 model, preprocess = load_from_name(args.base, device=device, download_root='./base')
 
 train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.image_in_memory, preprocess)
-train_loader = DataLoader(train_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
+train_loader = DataLoader(train_dataset, num_workers=args.workers,
+                          persistent_workers=True,
+                          prefetch_factor=4,
+                          shuffle=True, batch_size=args.batch_size,
                           pin_memory=True)
 
 val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.image_in_memory, preprocess)
-val_loader = DataLoader(val_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
+val_loader = DataLoader(val_dataset, num_workers=args.workers,
+                        persistent_workers=True,
+                        shuffle=True, batch_size=args.batch_size,
                         pin_memory=True)
 
 criterion_img = nn.CrossEntropyLoss().to(device)
