@@ -66,7 +66,7 @@ def evaluate_clip_multicap(
     img_feat_dict, img_id_order = {}, []         # id → embedding；保持顺序
     txt_feats, txt2img = [], []                  # 文本 embedding；其归属 img_id
 
-    for imgs, txt_tok, img_ids in val_loader:
+    for imgs, txt_tok, img_ids in tqdm.tqdm(val_loader,desc="Extracting features."):
         imgs, txt_tok, img_ids = imgs.to(device), txt_tok.to(device), img_ids.to(device)
 
         f_img = model.encode_image(imgs)
