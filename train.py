@@ -50,18 +50,18 @@ else:
 use_amp = (args.precision == "amp") and (device == "cuda")
 scaler = torch.GradScaler(device=device, enabled=use_amp)
 
-train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.image_in_memory)
+model, preprocess = load_from_name(args.base, device=device, download_root='./base')
+
+train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.image_in_memory, preprocess)
 train_loader = DataLoader(train_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
                           pin_memory=True)
 
-val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.image_in_memory)
+val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.image_in_memory, preprocess)
 val_loader = DataLoader(val_dataset, num_workers=args.workers, shuffle=True, batch_size=args.batch_size,
                         pin_memory=True)
 
 criterion_img = nn.CrossEntropyLoss().to(device)
 criterion_text = nn.CrossEntropyLoss().to(device)
-
-model, preprocess = load_from_name(args.base, device=device, download_root='./base')
 
 
 def freeze_and_get_optimizer(_optimizer_state=None):

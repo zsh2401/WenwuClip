@@ -73,12 +73,14 @@ def cached_tokenized(text):
 
 
 class WenwuDataset(Dataset):
-    def __init__(self, start_p: float, end_p: float, img_in_memory=False):
+    def __init__(self, start_p: float,
+                 end_p: float,
+                 img_in_memory=False, img_preprocess=None):
         super().__init__()
         self.data = load_data()
+        self.img_preprocess = img_preprocess
         self.img_in_memory = img_in_memory
         self.data = self.data[math.floor(start_p * len(self.data)):math.floor(end_p * len(self.data))]
-        self.transform = transform
 
     def __len__(self):
         return len(self.data)
@@ -89,7 +91,12 @@ class WenwuDataset(Dataset):
             image = get_image(str(image))
         else:
             image = Image.open(image).convert('RGB')
-        image_tensor = self.transform(image)
+
+        if self.img_preprocess:
+            image_tensor = self.img_preprocess(image)
+        else:
+            image_tensor = transform(image)
+
         assert not torch.isnan(image_tensor).any(), "Image tensor contains NaN"
         assert not torch.isinf(image_tensor).any(), "Image tensor contains Inf"
         assert not "" == caption.strip(), "Caption is empty"
