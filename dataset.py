@@ -72,6 +72,19 @@ def cached_tokenized(text):
     return tokenize([text]).squeeze(0)
 
 
+def decorator_timer(some_function):
+    from time import time
+
+    def wrapper(*args, **kwargs):
+        t1 = time()
+        result = some_function(*args, **kwargs)
+        end = time() - t1
+        print(f"Time taken: {end}")
+        return result
+
+    return wrapper
+
+
 class WenwuDataset(Dataset):
     def __init__(self, start_p: float,
                  end_p: float,
@@ -85,6 +98,7 @@ class WenwuDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+    @decorator_timer
     def __getitem__(self, idx):
         id, image, caption, img_id = self.data[idx]
         if self.img_in_memory:
@@ -97,10 +111,6 @@ class WenwuDataset(Dataset):
         else:
             image_tensor = transform(image)
 
-        assert not torch.isnan(image_tensor).any(), "Image tensor contains NaN"
-        assert not torch.isinf(image_tensor).any(), "Image tensor contains Inf"
-        assert not "" == caption.strip(), "Caption is empty"
-        # tokens = tokenize([caption]).squeeze(0)
         return image_tensor, cached_tokenized(caption), img_id
 
 
