@@ -32,6 +32,7 @@ parser.add_argument(
 
 parser.add_argument("--save-interval-epochs", type=int, default=1)
 args = parser.parse_args()
+
 if args.image_in_memory:
     print("Using Image In-Memory")
 

@@ -26,7 +26,10 @@ else:
     device = "cpu"
 
 test_dataset = WenwuDataset(0.9, 0.9 + (0.1 * args.data_scale))
-test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=args.workers, pin_memory=True)
+test_loader = DataLoader(test_dataset,
+                         batch_size=args.batch_size,
+                         num_workers=args.workers,
+                         pin_memory=True)
 
 model, preprocess = load_from_name(args.base, device=device, download_root='./base')
 if args.checkpoint is not None:
@@ -35,9 +38,9 @@ if args.checkpoint is not None:
 else:
     print("Using vanilla model for testing")
 model.to(device)
-
+model.eval()
 # evaluate(model, test_loader, device)
-
-scores = evaluate_clip_multicap(model, test_loader, device)
+with torch.no_grad():
+    scores = evaluate_clip_multicap(model, test_loader, device)
 print("Image → Text  Recall:", {k: v for k, v in scores.items() if k.startswith('i2t')})
 print("Text  → Image Recall:", {k: v for k, v in scores.items() if k.startswith('t2i')})
