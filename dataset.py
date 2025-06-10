@@ -24,15 +24,22 @@ def load_data(heat_images=False):
     with open(data_json_path, 'r') as f:
         items = json.load(f)["items"]
         ids = sorted(items.keys())
+    dynasties = set()
+    categories = set()
+    types = set()
     final_data = []
     next_id = 0
     path2id: dict[str, int] = {}
-    for id in tqdm.tqdm(ids, desc="Building captions"):
-        for caption in build_captions(items[id]):
-            if "img_paths" not in items[id]:
-                print(f"No images found for {items[id]["name"]}")
+    for id in tqdm.tqdm(ids, desc="Indexing dataset"):
+        item = items[id]
+        dynasties.add(item["meta"]["年代"])
+        categories.add(item["meta"]["分类"])
+        types.update(item["types"])
+        for caption in build_captions(item):
+            if "img_paths" not in item:
+                print(f"No images found for {item["name"]}")
             else:
-                for img_path in items[id]["img_paths"]:
+                for img_path in item["img_paths"]:
                     if img_path not in path2id:
                         path2id[img_path] = next_id
                         next_id += 1
@@ -44,7 +51,12 @@ def load_data(heat_images=False):
                     if heat_images:
                         get_image(str(dest))
 
-    return final_data
+    return {
+        "index": final_data,
+        "dynasties": dynasties,
+        "categories": categories,
+        "types": types
+    }
 
 
 def build_captions(item) -> list[str]:
@@ -86,10 +98,10 @@ class WenwuDataset(Dataset):
                  img_in_memory=False, img_preprocess=None,
                  device: str = "cpu"):
         super().__init__()
-        self.data = load_data(img_in_memory)
         self.img_preprocess = img_preprocess
         self.img_in_memory = img_in_memory
-        self.data = self.data[math.floor(start_p * len(self.data)):math.floor(end_p * len(self.data))]
+        indexing = load_data(img_in_memory)["index"]
+        self.data = indexing[math.floor(start_p * len(indexing)):math.floor(end_p * len(indexing))]
         self.transform = TV.Compose([
             TV.ToImage(),
             TV.ToDtype(torch.float32, scale=True),
