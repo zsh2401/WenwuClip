@@ -8,20 +8,13 @@ from PIL import Image
 import math
 import tqdm
 from torch.utils.data import Dataset
-from torchvision import transforms
+from torchvision.transforms import v2 as TV
 
 from cn_clip.clip import tokenize
 
 # CLIP 官方预训练时常用的归一化参数（RGB 三个通道的均值和标准差）
 CLIP_MEAN = [0.48145466, 0.4578275, 0.40821073]
 CLIP_STD = [0.26862954, 0.26130258, 0.27577711]
-
-transform = transforms.Compose([
-    transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(3 / 4, 4 / 3)),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize(CLIP_MEAN, CLIP_STD)
-])
 
 
 @cache
@@ -90,12 +83,20 @@ def decorator_timer(some_function):
 class WenwuDataset(Dataset):
     def __init__(self, start_p: float,
                  end_p: float,
-                 img_in_memory=False, img_preprocess=None):
+                 img_in_memory=False, img_preprocess=None,
+                 device: str = "cpu"):
         super().__init__()
         self.data = load_data(img_in_memory)
         self.img_preprocess = img_preprocess
         self.img_in_memory = img_in_memory
         self.data = self.data[math.floor(start_p * len(self.data)):math.floor(end_p * len(self.data))]
+        self.transform = TV.Compose([
+            TV.ToImage(),
+            TV.ToDtype(torch.float32, scale=True),
+            TV.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(3 / 4, 4 / 3)),
+            TV.RandomHorizontalFlip(),
+            TV.Normalize(CLIP_MEAN, CLIP_STD),
+        ]).to(device)
 
     def __len__(self):
         return len(self.data)
@@ -111,7 +112,7 @@ class WenwuDataset(Dataset):
         if self.img_preprocess:
             image_tensor = self.img_preprocess(image)
         else:
-            image_tensor = transform(image)
+            image_tensor = self.transform(image)
 
         return image_tensor, cached_tokenized(caption), img_id
 
