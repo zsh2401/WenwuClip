@@ -1,6 +1,38 @@
 from typing import List, Dict, Tuple
 import torch
+from cn_clip.clip import tokenize
+from cn_clip.clip.model import CLIP
+from torch import Tensor
+import tqdm
 
+
+def encode_text_in_batch(model: CLIP, prompts: list[str], device: str, batch_size: int = 384) -> torch.Tensor:
+    model.eval()
+    feats_list: list[Tensor] = []  # 收集每批特征
+
+    rng = range(0, len(prompts), batch_size)
+    pbar = tqdm.tqdm(rng, desc="encode_text", unit="batch")
+
+    for start in pbar:
+        end = min(start + batch_size, len(prompts))
+        sub_prompts = prompts[start:end]
+
+        # --- Tokenize 在 CPU ---
+        tokens = tokenize(sub_prompts).to(device)
+
+        feats_list.extend(model.encode_text(tokens))
+
+    return torch.stack(feats_list).to(device)
+
+
+def print_classifier(prob_dict,selected):
+    # 4. 打印结果
+    strs = []
+    for p, prob in prob_dict:
+        strs.append(f"{p:<10} : {prob.item() * 100:5.2f}%")
+
+    print("\n".join(strs))
+    print("\n预测结果:", selected)
 
 def classifier(prompts: list[str],
                image_feats,
@@ -19,13 +51,19 @@ def classifier(prompts: list[str],
 
     # 3. softmax 得到概率
     probs = logits_per_image.softmax(dim=-1).squeeze(0)  # (4,)
-
-    # 4. 打印结果
-    for p, prob in zip(prompts, probs):
-        print(f"{p:<10} : {prob.item() * 100:5.2f}%")
-
     pred_idx = probs.argmax().item()
-    print("\n预测结果:", prompts[pred_idx])
+
+
+    return zip(prompts, probs), prompts[pred_idx]
+
+
+def print_probable(prob_dict, selected):
+    strs = []
+    for p, prob in prob_dict:
+        strs.append(f"{p:<10} : {prob:5.2%}")
+
+    print("\nProb:", "\n".join(strs))
+    print("\nSelected:", ', '.join(selected))
 
 
 def probable(
@@ -35,7 +73,7 @@ def probable(
         logit_scale: torch.Tensor,  # scalar tensor
         top_k: int | None = 3,
         score_threshold: float | None = None,
-) -> Tuple[Dict[str, float], List[str]]:
+):
     """
     多标签推断：返回 {属性: 置信度} + 满足过滤条件的属性列表
     参数
@@ -47,13 +85,15 @@ def probable(
     image_feats = image_feats / image_feats.norm(dim=-1, keepdim=True)
     text_feats = text_feats / text_feats.norm(dim=-1, keepdim=True)
 
-    scores = (logit_scale.exp() * image_feats @ text_feats.T).squeeze(0)  # (N_attr,)
+    TEMP = 1
+    scores = (TEMP * image_feats @ text_feats.T).squeeze(0)  # (N_attr,)
 
     # 2. Sigmoid → [0,1] 概率（互不排斥）
     probs = scores.sigmoid()
+    print(probs)
 
     # 3. 组装字典
-    prob_dict = {p: float(prob) for p, prob in zip(prompts, probs)}
+    prob_dict = zip(prompts, probs)
 
     # 4. 过滤：Top-K & 阈值，两种逻辑可并存
     keep_mask = torch.ones_like(probs, dtype=torch.bool)
