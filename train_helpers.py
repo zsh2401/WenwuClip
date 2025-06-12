@@ -219,11 +219,13 @@ def train(bar_prefix: str,
 
             # print(text_tokens.device, text_tokens.dtype)
             if use_amp:
-                with torch.autocast(device_type=device, dtype=torch.float16):
+                with torch.autocast(device_type="cuda", dtype=torch.float16):
                     # print(f"{device} float 16")
                     loss = get_loss(model, images, text_tokens, criterion_img, criterion_text)
                     # print(loss.dtype)
                 scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 scaler.step(optimizer)
                 scaler.update()
             else:
