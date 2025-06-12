@@ -1,5 +1,7 @@
 # dist_utils.py
 import os, torch.distributed as dist, torch
+from datetime import timedelta
+
 
 def setup_distributed():
     """
@@ -7,7 +9,7 @@ def setup_distributed():
     否则返回 world_size=1, rank=0 (单机/单卡)
     """
     if "WORLD_SIZE" in os.environ and int(os.environ["WORLD_SIZE"]) > 1:
-        dist.init_process_group(backend="nccl")
+        dist.init_process_group(backend="nccl",timeout=timedelta(hours=24))
         local_rank = int(os.environ["LOCAL_RANK"])
         world_size = int(os.environ["WORLD_SIZE"])
         torch.cuda.set_device(local_rank)
