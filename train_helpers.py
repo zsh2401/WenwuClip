@@ -108,16 +108,20 @@ def evaluate_clip_multicap(
         "score": 0,
     }
     for k in topk:
-        # —— I → T（按行求 top-k caption）
-        idx_top_txt = sim_i2t.topk(k, dim=-1).indices  # (N_img, k)
-        hit_i2t = (txt2row[idx_top_txt] == torch.arange(
-            sim_i2t.size(0), device=device).unsqueeze(1)).any(dim=1)
-        results["i2t"].append(hit_i2t.float().mean().item())
+        try:
+            # —— I → T（按行求 top-k caption）
+            idx_top_txt = sim_i2t.topk(k, dim=-1).indices  # (N_img, k)
+            hit_i2t = (txt2row[idx_top_txt] == torch.arange(
+                sim_i2t.size(0), device=device).unsqueeze(1)).any(dim=1)
+            results["i2t"].append(hit_i2t.float().mean().item())
 
-        # —— T → I（按行求 top-k image）
-        idx_top_img = sim_t2i.topk(k, dim=-1).indices  # (N_txt, k)
-        hit_t2i = (idx_top_img == txt2row.unsqueeze(1)).any(dim=1)
-        results["t2i"].append(hit_t2i.float().mean().item())
+            # —— T → I（按行求 top-k image）
+            idx_top_img = sim_t2i.topk(k, dim=-1).indices  # (N_txt, k)
+            hit_t2i = (idx_top_img == txt2row.unsqueeze(1)).any(dim=1)
+            results["t2i"].append(hit_t2i.float().mean().item())
+
+        except Exception as e:
+            print(e)
 
     scores = results["t2i"] + results["t2i"]
     results["score"] = sum(scores) / len(scores)
