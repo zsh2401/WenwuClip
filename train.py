@@ -25,7 +25,7 @@ def get_args():
     parser.add_argument("-b", "--batch-size", type=int, default=32)
     parser.add_argument("-e", "--epochs", type=int, default=10)
     parser.add_argument("-l", "--lr", type=float, default=5e-7)
-    parser.add_argument("--image-in-memory", type=bool, default=False)
+    parser.add_argument("--memorize-images", type=bool, default=False)
     parser.add_argument("--heat-images", type=bool, default=False)
     parser.add_argument("-w", "--workers", type=int, default=0)
     parser.add_argument("-d", "--device", type=str, default=None)
@@ -45,8 +45,8 @@ def get_args():
 
 
 def get_dataloaders(args, device, distributed: bool, rank: int, world: int):
-    train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.image_in_memory, device=device)
-    val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.image_in_memory, device=device)
+    train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.memorize_images, device=device)
+    val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.memorize_images, device=device)
 
     if distributed:
         train_sampler = DistributedSampler(train_dataset, num_replicas=world, rank=rank, shuffle=True)
@@ -112,15 +112,14 @@ if __name__ == "__main__":
     args = get_args()
     distributed, local_rank, world_size = setup_distributed()
     device = determine_device(args, local_rank)
-
+    train_loader, val_loader, train_sampler, val_sampler = get_dataloaders(args, device, distributed, local_rank,
+                                                                           world_size)
     use_amp = args.precision == "amp"
     scaler = torch.GradScaler(device=device, enabled=use_amp)
 
     model, preprocess = load_from_name(args.base, device=device, download_root='./base')
     model = move_to(model, device, args.precision)
 
-    train_loader, val_loader, train_sampler, val_sampler = get_dataloaders(args, device, distributed, local_rank,
-                                                                           world_size)
 
     checkpoint = Path("checkpoints") / (args.project + ".pt")
     optimizer_state = None
