@@ -18,7 +18,7 @@ CLIP_STD = [0.26862954, 0.26130258, 0.27577711]
 
 
 @cache
-def load_data(heat_images=False):
+def get_index_data():
     data_json_path: str = "./dataset/data.json.txt"
     images_root = Path("./dataset/")
     with open(data_json_path, 'r') as f:
@@ -48,8 +48,6 @@ def load_data(heat_images=False):
                     final_data.append((
                         id, dest, caption, img_id
                     ))
-                    if heat_images:
-                        get_image(str(dest))
 
     return {
         "index": final_data,
@@ -78,7 +76,6 @@ def get_image(path: str):
 def cached_tokenized(text):
     return tokenize([text]).squeeze(0)
 
-
 def decorator_timer(some_function):
     from time import time
 
@@ -95,12 +92,13 @@ def decorator_timer(some_function):
 class WenwuDataset(Dataset):
     def __init__(self, start_p: float,
                  end_p: float,
-                 img_in_memory=False, img_preprocess=None,
+                 img_in_memory=False,
+                 img_preprocess=None,
                  device: str = "cpu"):
         super().__init__()
         self.img_preprocess = img_preprocess
         self.img_in_memory = img_in_memory
-        indexing = load_data(img_in_memory)["index"]
+        indexing = get_index_data()["index"]
         self.data = indexing[math.floor(start_p * len(indexing)):math.floor(end_p * len(indexing))]
         self.transform = TV.Compose([
             TV.ToImage(),

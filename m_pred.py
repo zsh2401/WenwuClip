@@ -6,7 +6,7 @@ from cn_clip.clip import load_from_name, tokenize
 from PIL import Image
 
 from application import classifier, probable, encode_text_in_batch, print_classifier, print_probable
-from dataset import load_data
+from dataset import get_index_data
 from train_helpers import read_state
 
 parser = argparse.ArgumentParser()
@@ -38,13 +38,13 @@ if args.project is not None:
 
 if __name__ == "__main__":
     model.eval()
-    category_prompts = ["是" + cate for cate in load_data()["categories"]]
+    category_prompts = ["是" + cate for cate in get_index_data()["categories"]]
     types_prompts = []
-    for _t in load_data()["types"]:
+    for _t in get_index_data()["types"]:
         for template in ["是一件{}", "这个物品属于{}类别", "一个{}文物"]:
             types_prompts.append(template.format(_t))
 
-    print(f"There are {len(load_data()["types"])} types available. There are {len(load_data()["categories"])} categories.")
+    print(f"There are {len(get_index_data()["types"])} types available. There are {len(get_index_data()["categories"])} categories.")
     with torch.no_grad():
         images = preprocess(Image.open(args.image).convert("RGB")).unsqueeze(0).to(device)
 

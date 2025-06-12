@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 
 import torch
+import tqdm
 from cn_clip.clip import load_from_name
 from cn_clip.clip.model import CLIP
 from peft import LoraConfig, get_peft_model
@@ -25,6 +26,7 @@ def get_args():
     parser.add_argument("-e", "--epochs", type=int, default=10)
     parser.add_argument("-l", "--lr", type=float, default=5e-7)
     parser.add_argument("--image-in-memory", type=bool, default=False)
+    parser.add_argument("--heat-images", type=bool, default=False)
     parser.add_argument("-w", "--workers", type=int, default=0)
     parser.add_argument("-d", "--device", type=str, default=None)
     parser.add_argument("--base", type=str, default="ViT-H-14")
@@ -68,6 +70,13 @@ def get_dataloaders(args, device, distributed: bool, rank: int, world: int):
                             shuffle=val_sampler is None,
                             batch_size=args.batch_size,
                             pin_memory=True)
+
+    if args.heat_images:
+        for i in tqdm.tqdm(range(len(train_dataset)),desc="Heating images for training"):
+            _ = train_dataset[i]
+
+        for i in tqdm.tqdm(range(len(val_dataset)),desc="Heating images for validating"):
+            _ = val_dataset[i]
 
     return train_loader, val_loader, train_sampler, val_sampler
 
