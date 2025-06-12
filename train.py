@@ -172,10 +172,11 @@ if __name__ == "__main__":
             "train_loss": train_loss,
             "performance": eval_result,
         })
+
         # print(eval_result)
         save_reports(args.project, reports)
 
         if score > highest_score:
             highest_score = score
             save_state(filename=f"checkpoints/{args.project}.pt",
-                       model=model, optimizer=optimizer, epoch=epoch, scaler=scaler)
+                       model=model.module if distributed else model , optimizer=optimizer, epoch=epoch, scaler=scaler)
