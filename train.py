@@ -9,7 +9,7 @@ from cn_clip.clip.model import CLIP
 from peft import LoraConfig, get_peft_model
 from torch.utils.data import DataLoader, DistributedSampler
 
-from dataset import WenwuDataset
+from dataset import WenwuDataset, heat
 from dist_utils import setup_distributed
 from utils import determine_device
 
@@ -72,11 +72,7 @@ def get_dataloaders(args, device, distributed: bool, rank: int, world: int):
                             pin_memory=True)
 
     if args.heat_images:
-        for i in tqdm.tqdm(range(len(train_dataset)),desc="Heating images for training"):
-            _ = train_dataset[i]
-
-        for i in tqdm.tqdm(range(len(val_dataset)),desc="Heating images for validating"):
-            _ = val_dataset[i]
+        heat()
 
     return train_loader, val_loader, train_sampler, val_sampler
 

@@ -30,6 +30,7 @@ def get_index_data():
     final_data = []
     next_id = 0
     path2id: dict[str, int] = {}
+    images = set()
     for id in tqdm.tqdm(ids, desc="Indexing dataset"):
         item = items[id]
         dynasties.add(item["meta"]["年代"])
@@ -40,6 +41,7 @@ def get_index_data():
                 print(f"No images found for {item["name"]}")
             else:
                 for img_path in item["img_paths"]:
+                    images.add(img_path)
                     if img_path not in path2id:
                         path2id[img_path] = next_id
                         next_id += 1
@@ -53,9 +55,18 @@ def get_index_data():
         "index": final_data,
         "dynasties": dynasties,
         "categories": categories,
-        "types": types
+        "types": types,
+        "images" : images
     }
 
+
+def heat():
+    index_data = get_index_data()
+    images = index_data["images"]
+    images_root = Path("./dataset/")
+    for image_path in tqdm.tqdm(images, desc="Heating images"):
+        # id, image, caption, img_id = self.data[i]
+        get_image(str(images_root / image_path))
 
 def build_captions(item) -> list[str]:
     result: list[str] = []
@@ -76,6 +87,7 @@ def get_image(path: str):
 def cached_tokenized(text):
     return tokenize([text]).squeeze(0)
 
+
 def decorator_timer(some_function):
     from time import time
 
@@ -92,12 +104,12 @@ def decorator_timer(some_function):
 class WenwuDataset(Dataset):
     def __init__(self, start_p: float,
                  end_p: float,
-                 img_in_memory=False,
+                 memorize_images=False,
                  img_preprocess=None,
                  device: str = "cpu"):
         super().__init__()
         self.img_preprocess = img_preprocess
-        self.img_in_memory = img_in_memory
+        self.memorize_images = memorize_images
         indexing = get_index_data()["index"]
         self.data = indexing[math.floor(start_p * len(indexing)):math.floor(end_p * len(indexing))]
         self.transform = TV.Compose([
@@ -114,7 +126,7 @@ class WenwuDataset(Dataset):
     # @decorator_timer
     def __getitem__(self, idx):
         id, image, caption, img_id = self.data[idx]
-        if self.img_in_memory:
+        if self.memorize_images:
             image = get_image(str(image))
         else:
             image = Image.open(image).convert('RGB')
