@@ -188,6 +188,20 @@ def get_loss(model: CLIP, images, text_tokens,
     loss = (loss_i2t + loss_t2i) / 2
     return loss
 
+def inspect_model_dtype(model):
+    import collections, torch
+    cnt = collections.Counter(p.dtype for p in model.parameters())
+    print("### Parameter dtypes:")
+    for dtype, n in cnt.items():
+        print(f"  {dtype}: {n} tensors")
+
+    # 看首个可训练参数
+    first = next(p for p in model.parameters() if p.requires_grad)
+    print("\nfirst trainable param dtype :", first.dtype)
+
+    # 如果已经做过一次反向，还能看梯度 dtype
+    if first.grad is not None:
+        print("first grad dtype             :", first.grad.dtype)
 
 def move_model_to(module: CLIP, device, precision):
     if precision == "fp32":
