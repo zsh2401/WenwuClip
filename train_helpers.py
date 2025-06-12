@@ -209,7 +209,7 @@ def move_model_to(module: CLIP, device, precision):
     elif precision == "fp16":
         return module.to(device, dtype=torch.float16)
     else:
-        return module.to(device)
+        return module.to(device).float()
 
 
 def train(bar_prefix: str,

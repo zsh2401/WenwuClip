@@ -116,6 +116,7 @@ if __name__ == "__main__":
 
     model, preprocess = load_from_name(args.base, device=device, download_root='./base')
     model = move_model_to(model, device, args.precision)
+    inspect_model_dtype(model)
 
     checkpoint = Path("checkpoints") / (args.project + ".pt")
     optimizer_state = None
@@ -142,7 +143,6 @@ if __name__ == "__main__":
 
     reports = read_reports(args.project)
     print(f"use_amp={use_amp} device={device} precision={args.precision}")
-
 
     inspect_model_dtype(model)
     for epoch in range(start_epoch, args.epochs + 1):
