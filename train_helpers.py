@@ -189,10 +189,12 @@ def get_loss(model: CLIP, images, text_tokens,
     return loss
 
 
-def move_to(module: Module, device, precision):
+def move_model_to(module: CLIP, device, precision):
     if precision == "fp32":
         return module.to(device, dtype=torch.float32)
     elif precision == "fp16":
+        return module.to(device, dtype=torch.float16)
+    elif precision == "amp":
         return module.to(device, dtype=torch.float16)
     else:
         return module.to(device)

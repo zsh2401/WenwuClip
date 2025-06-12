@@ -16,7 +16,7 @@ from utils import determine_device
 
 torch.backends.verbose = True
 torch.backends.cudnn.benchmark = True
-from train_helpers import train, save_state, read_state, read_reports, save_reports, move_to, \
+from train_helpers import train, save_state, read_state, read_reports, save_reports, move_model_to, \
     evaluate_clip_multicap
 from freeze_strategies import freeze
 
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     scaler = torch.GradScaler(device=device, enabled=use_amp)
 
     model, preprocess = load_from_name(args.base, device=device, download_root='./base')
-    model = move_to(model, device, args.precision)
+    model = move_model_to(model, device, args.precision)
 
     checkpoint = Path("checkpoints") / (args.project + ".pt")
     optimizer_state = None
