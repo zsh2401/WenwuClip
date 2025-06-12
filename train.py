@@ -161,7 +161,7 @@ if __name__ == "__main__":
         eval_result = evaluate_clip_multicap(model, val_loader, device)
         ## 一些打印和保存结果的工作
         score = eval_result["score"]
-        highest_score = 0
+        highest_score = float("-inf")
         for hitem in reports["history"]:
             s = hitem["performance"]["score"]
             if s > highest_score:
