@@ -25,14 +25,24 @@ def encode_text_in_batch(model: CLIP, prompts: list[str], device: str, batch_siz
     return torch.stack(feats_list).to(device)
 
 
-def print_classifier(prob_dict,selected):
+def print_classifier(prompts: list[str], probs, selected):
     # 4. 打印结果
     strs = []
-    for p, prob in prob_dict:
-        strs.append(f"{p:<10} : {prob.item() * 100:5.2f}%")
+    for i, prob in enumerate(probs):
+        strs.append(f"{prompts[i]:<10} : {prob.item():5.2%}")
 
     print("\n".join(strs))
-    print("\n预测结果:", selected)
+    print("\n预测结果:", prompts[selected])
+
+
+def print_probable(prompts: list[str], probs, selected):
+    strs = []
+    for i, prob in enumerate(probs):
+        strs.append(f"{prompts[i]:<10} : {prob:5.2%}")
+
+    print("\nProb:", "\n".join(strs))
+    print("\nSelected:", ', '.join([prompts[sel] for sel in selected]))
+
 
 def classifier(prompts: list[str],
                image_feats,
@@ -53,17 +63,7 @@ def classifier(prompts: list[str],
     probs = logits_per_image.softmax(dim=-1).squeeze(0)  # (4,)
     pred_idx = probs.argmax().item()
 
-
-    return zip(prompts, probs), prompts[pred_idx]
-
-
-def print_probable(prob_dict, selected):
-    strs = []
-    for p, prob in prob_dict:
-        strs.append(f"{p:<10} : {prob:5.2%}")
-
-    print("\nProb:", "\n".join(strs))
-    print("\nSelected:", ', '.join(selected))
+    return probs, pred_idx
 
 
 def probable(
@@ -93,7 +93,7 @@ def probable(
     print(probs)
 
     # 3. 组装字典
-    prob_dict = zip(prompts, probs)
+    # prob_dict = zip(prompts, probs)
 
     # 4. 过滤：Top-K & 阈值，两种逻辑可并存
     keep_mask = torch.ones_like(probs, dtype=torch.bool)
@@ -107,6 +107,6 @@ def probable(
     if score_threshold is not None:
         keep_mask &= (probs >= score_threshold)
 
-    selected = [prompts[i] for i, keep in enumerate(keep_mask) if keep]
+    selected_idx = [i for i, keep in enumerate(keep_mask) if keep]
 
-    return prob_dict, selected
+    return probs, selected_idx

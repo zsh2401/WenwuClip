@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import argparse
 import os
 from pathlib import Path
@@ -6,7 +7,7 @@ import torch
 from cn_clip.clip import load_from_name
 from cn_clip.clip.model import CLIP
 from torch.utils.data import DataLoader
-
+from peft import LoraConfig, get_peft_model
 from dataset import WenwuDataset
 
 torch.backends.verbose = True
@@ -20,12 +21,14 @@ parser.add_argument("-b", "--batch-size", type=int, default=32)
 parser.add_argument("-e", "--epochs", type=int, default=10)
 parser.add_argument("-l", "--lr", type=float, default=5e-7)
 parser.add_argument("--image-in-memory", type=bool, default=False)
-parser.add_argument("-w", "--workers", type=int, default=8)
+parser.add_argument("-w", "--workers", type=int, default=0)
 parser.add_argument("-d", "--device", type=str, default=None)
 parser.add_argument("--base", type=str, default="ViT-H-14")
 parser.add_argument("--data-scale", type=float, default=1)
 parser.add_argument("--freeze-mode", type=str, default="a")
 parser.add_argument("-p", "--project", type=str, default="default")
+# parser.add_argument("--lora-layers", type=str, nargs="+", default=[])
+parser.add_argument("--lora-layers", type=str, nargs="+", default=[])
 parser.add_argument(
     "--precision",
     choices=["fp32", "amp", "fp16"],  # 新增 'fp32' / 'fp16'
@@ -65,29 +68,53 @@ val_loader = DataLoader(val_dataset, num_workers=args.workers,
                         pin_memory=True)
 
 
-def freeze_and_get_optimizer(_model: CLIP, _optimizer_state=None):
-    freeze(_model, args.freeze_mode)
-    trainable_params = [p for p in _model.parameters() if p.requires_grad]
-    _optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
-    if _optimizer_state is not None:
-        _optimizer.load_state_dict(_optimizer_state)
-    return _optimizer
+def lora(_model: CLIP):
+    if args.lora_layers:
+        # 1) 针对“文本 BERT”加 LoRA
+        bert_lora = LoraConfig(
+            r=8, lora_alpha=16, lora_dropout=0.05,
+            target_modules=["query", "key", "value", "dense"],
+            bias="none"
+        )
+        print(_model.bert.config)
+        _model.bert.config = _model.bert.config
+        _model.bert = get_peft_model(_model.bert, bert_lora)
 
+        # 2) 可选：视觉 Transformer 也加
+        vit_lora = LoraConfig(
+            r=8, lora_alpha=16, lora_dropout=0.05,
+            target_modules=["in_proj_weight", "out_proj", "c_fc"],
+            bias="none"
+        )
+        _model.visual.transformer = get_peft_model(
+            _model.visual.transformer, vit_lora
+        )
+        _model.bert.print_trainable_parameters()
+        _model.visual.transformer.print_trainable_parameters()
+
+    return model
 
 if __name__ == "__main__":
     model, preprocess = load_from_name(args.base, device=device, download_root='./base')
 
     model = move_to(model, device, args.precision)
     checkpoint = Path("checkpoints") / (args.project + ".pt")
+    optimizer_state = None
     if args.project is not None and checkpoint.exists():
         model_state, optimizer_state, scaler_state, start_epoch = read_state(checkpoint, device)
         scaler.load_state_dict(scaler_state)
         model.load_state_dict(model_state)
-        optimizer = freeze_and_get_optimizer(model, optimizer_state)
-
     else:
-        optimizer = freeze_and_get_optimizer(model)
         start_epoch = 1
+
+    freeze(model, args.freeze_mode)
+
+    model = lora(model)
+
+    trainable_params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
 
     reports = read_reports(args.project)
     print(f"use_amp={use_amp} device={device} precision={args.precision}")
@@ -116,7 +143,6 @@ if __name__ == "__main__":
         })
         print(eval_result)
         save_reports(args.project, reports)
-
 
         if score > highest_score:
             highest_score = score

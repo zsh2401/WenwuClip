@@ -44,6 +44,7 @@ if __name__ == "__main__":
         for template in ["是一件{}", "这个物品属于{}类别", "一个{}文物"]:
             types_prompts.append(template.format(_t))
 
+    print(f"There are {len(load_data()["types"])} types available. There are {len(load_data()["categories"])} categories.")
     with torch.no_grad():
         images = preprocess(Image.open(args.image).convert("RGB")).unsqueeze(0).to(device)
 
@@ -57,9 +58,9 @@ if __name__ == "__main__":
         logit_scale = model.logit_scale.clamp(max=4.6052)  # 必须狠狠冷静一下！
 
         pd1, s1 = classifier(category_prompts, image_feats, logit_scale, cate_text_feats)
-        print_classifier(pd1,s1)
+        print_classifier(category_prompts, pd1, s1)
 
         pd2, s2 = probable(types_prompts, image_feats=image_feats, text_feats=types_text_feats, logit_scale=logit_scale,
                            top_k=10)
-        print_probable(pd2,s2)
+        print_probable(types_prompts, pd2, s2)
         # print(s)
