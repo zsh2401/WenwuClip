@@ -164,7 +164,7 @@ if __name__ == "__main__":
             # 只有主进程进行验证与提交
             eval_result = evaluate_clip_multicap(model, val_loader, device)
             current_score = eval_result["score"]
-            highest_score = max(float("-inf"), *[hitem["performance"]["score"] for hitem in reports["history"]])
+            highest_score = max([float("-inf")] + [hitem["performance"]["score"] for hitem in reports["history"]])
             reports["history"].append({
                 "epoch": epoch,
                 "train_loss": train_loss,
