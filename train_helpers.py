@@ -194,8 +194,6 @@ def move_model_to(module: CLIP, device, precision):
         return module.to(device, dtype=torch.float32)
     elif precision == "fp16":
         return module.to(device, dtype=torch.float16)
-    elif precision == "amp":
-        return module.to(device, dtype=torch.float16)
     else:
         return module.to(device)
 
