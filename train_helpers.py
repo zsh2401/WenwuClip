@@ -209,6 +209,9 @@ def move_model_to(module: CLIP, device, precision):
     elif precision == "fp16":
         return module.to(device, dtype=torch.float16)
     else:
+        # 确保模型完全处于fp32精度，否则将无法进行自动精度转换的训练。
+        # 这个非常重要，如果不这么做，模型中有部分tensor的精度是float16，
+        # 这会导致后续的计算要么出现nan，要么Scaler无法工作。
         return module.to(device).float()
 
 
@@ -231,15 +234,14 @@ def train(bar_prefix: str,
             images = images.to(device)
             text_tokens = text_tokens.to(device)
 
-            # print(text_tokens.device, text_tokens.dtype)
             if use_amp:
+
+                # 使用半精度进行forward
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
-                    # print(f"{device} float 16")
                     loss = get_loss(model, images, text_tokens, criterion_img, criterion_text)
-                    # print(loss.dtype)
+
+                # 进行缩放
                 scaler.scale(loss).backward()
-                # scaler.unscale_(optimizer)
-                # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 scaler.step(optimizer)
                 scaler.update()
             else:
@@ -251,6 +253,7 @@ def train(bar_prefix: str,
             epoch_bar.update(1)
             epoch_bar.set_postfix(loss=f"{loss.item():.4f}")
 
+    # 计算平均loss
     return sum(losses) / len(losses)
 
 

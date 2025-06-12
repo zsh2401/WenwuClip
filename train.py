@@ -127,7 +127,10 @@ if __name__ == "__main__":
     else:
         start_epoch = 1
 
+    # 根据策略，进行一些冻结
     freeze(model, args.freeze_mode)
+
+    # DDP训练支持
     if distributed:
         model = torch.nn.parallel.DistributedDataParallel(model,
                                                           device_ids=[local_rank],
@@ -137,12 +140,14 @@ if __name__ == "__main__":
         model.encode_text = model.module.encode_text
 
     trainable_params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
+    optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01,eps=1e-8)
     if optimizer_state is not None:
         optimizer.load_state_dict(optimizer_state)
 
     reports = read_reports(args.project)
     print(f"use_amp={use_amp} device={device} precision={args.precision}")
+
+    # 看看模型现在是啥
 
     inspect_model_dtype(model)
     for epoch in range(start_epoch, args.epochs + 1):
@@ -178,4 +183,5 @@ if __name__ == "__main__":
                            scaler=scaler)
 
         if distributed:
+            # 让其他GPU进程等一等主进程的验证
             torch.distributed.barrier()
