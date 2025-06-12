@@ -132,6 +132,8 @@ if __name__ == "__main__":
                                                           device_ids=[local_rank],
                                                           output_device=local_rank,
                                                           find_unused_parameters=False)
+        model.encode_image = model.module.encode_image
+        model.encode_text = model.module.encode_text
 
     trainable_params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
