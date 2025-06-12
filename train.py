@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+from math import ceil
 from pathlib import Path
 
 import torch
@@ -68,7 +69,7 @@ def get_dataloaders(args, device, distributed: bool, rank: int, world: int):
                             persistent_workers=args.workers > 0,
                             prefetch_factor=4 if args.workers > 0 else None,
                             shuffle=val_sampler is None,
-                            batch_size=args.batch_size,
+                            batch_size=ceil(args.batch_size / 2),
                             pin_memory=True)
 
     if args.heat_images:
@@ -116,7 +117,6 @@ if __name__ == "__main__":
     model, preprocess = load_from_name(args.base, device=device, download_root='./base')
     model = move_to(model, device, args.precision)
 
-
     checkpoint = Path("checkpoints") / (args.project + ".pt")
     optimizer_state = None
     if args.project is not None and checkpoint.exists():
@@ -155,28 +155,25 @@ if __name__ == "__main__":
                            device=device, precision=args.precision, use_amp=use_amp,
                            scaler=scaler)
 
-        if local_rank != 0:
-            continue
+        if distributed:
+            torch.distributed.barrier()
 
-        eval_result = evaluate_clip_multicap(model, val_loader, device)
-        ## 一些打印和保存结果的工作
-        score = eval_result["score"]
-        highest_score = float("-inf")
-        for hitem in reports["history"]:
-            s = hitem["performance"]["score"]
-            if s > highest_score:
-                highest_score = s
+        if local_rank == 0:
+            # 只有主进程进行验证与提交
+            eval_result = evaluate_clip_multicap(model, val_loader, device)
+            current_score = eval_result["score"]
+            highest_score = max(float("-inf"), *[hitem["performance"]["score"] for hitem in reports["history"]])
+            reports["history"].append({
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "performance": eval_result,
+            })
+            save_reports(args.project, reports)
+            if current_score > highest_score:
+                highest_score = current_score
+                save_state(filename=f"checkpoints/{args.project}.pt",
+                           model=model.module if distributed else model, optimizer=optimizer, epoch=epoch,
+                           scaler=scaler)
 
-        reports["history"].append({
-            "epoch": epoch,
-            "train_loss": train_loss,
-            "performance": eval_result,
-        })
-
-        # print(eval_result)
-        save_reports(args.project, reports)
-
-        if score > highest_score:
-            highest_score = score
-            save_state(filename=f"checkpoints/{args.project}.pt",
-                       model=model.module if distributed else model , optimizer=optimizer, epoch=epoch, scaler=scaler)
+        if distributed:
+            torch.distributed.barrier()
