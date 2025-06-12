@@ -224,7 +224,7 @@ def train(bar_prefix: str,
                     loss = get_loss(model, images, text_tokens, criterion_img, criterion_text)
                     # print(loss.dtype)
                 scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
+                # scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 scaler.step(optimizer)
                 scaler.update()
