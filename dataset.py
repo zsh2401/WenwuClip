@@ -80,7 +80,7 @@ def build_captions(item) -> list[str]:
 
 @cache
 def get_image(path: str):
-    print(f"Cache missing {path}")
+    # print(f"Cache missing {path}")
     return Image.open(path).convert('RGB')
 
 
