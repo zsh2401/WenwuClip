@@ -12,6 +12,7 @@ def setup_distributed():
         world_size = int(os.environ["WORLD_SIZE"])
         torch.cuda.set_device(local_rank)
         distributed = True
+        # print(f"Running under ddp {world_size} {}")
     else:
         local_rank = 0
         world_size = 1

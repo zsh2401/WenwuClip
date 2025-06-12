@@ -42,7 +42,7 @@ def get_args():
     return parser.parse_args()
 
 
-def get_dataloaders(args, distributed: bool, rank: int, world: int):
+def get_dataloaders(args, device, distributed: bool, rank: int, world: int):
     train_dataset = WenwuDataset(0, 0 + (0.8 * args.data_scale), args.image_in_memory, device=device)
     val_dataset = WenwuDataset(0.8, 0.8 + (0.1 * args.data_scale), args.image_in_memory, device=device)
 
@@ -110,7 +110,8 @@ if __name__ == "__main__":
     model, preprocess = load_from_name(args.base, device=device, download_root='./base')
     model = move_to(model, device, args.precision)
 
-    train_loader, val_loader, train_sampler, val_sampler = get_dataloaders(args, distributed, local_rank, world_size)
+    train_loader, val_loader, train_sampler, val_sampler = get_dataloaders(args, device, distributed, local_rank,
+                                                                           world_size)
 
     checkpoint = Path("checkpoints") / (args.project + ".pt")
     optimizer_state = None
